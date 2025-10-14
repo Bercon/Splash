@@ -35,7 +35,7 @@ async function init() {
 	const context = canvas.getContext('webgpu') as GPUCanvasContext
 
 	if (!context) {
-		throw new Error()	
+		throw new Error()
 	}
 
 	let devicePixelRatio  = 0.7;
@@ -60,16 +60,16 @@ function initGui(particleCountTexts: string[]) {
 	const params = {
 		sigma: 1.3,
 		running: true,
-		r: 140, 
-		g:220, 
-		b:240,  
-		speed: 0.8, 
-		colorDensity: 0.7, 
-		numParticles: particleCountTexts[1], 
+		r: 140,
+		g:220,
+		b:240,
+		speed: 0.8,
+		colorDensity: 0.7,
+		numParticles: particleCountTexts[1],
 		toggleSimulation: () => {
 			params.running = !params.running;
 		}
-	};	
+	};
 
 	const numParticlesFolder = gui.addFolder('Number of Particles');
 	numParticlesFolder.add(params, 'numParticles', particleCountTexts)
@@ -84,8 +84,8 @@ function initGui(particleCountTexts: string[]) {
 	colorFolder.close();
 
 	document.addEventListener('keydown', (event) => {
-		if (event.code === 'KeyP') { 
-		  params.toggleSimulation(); 
+		if (event.code === 'KeyP') {
+		  params.toggleSimulation();
 		}
 	});
 
@@ -94,7 +94,7 @@ function initGui(particleCountTexts: string[]) {
 
 async function main() {
 	const { canvas, device, presentationFormat, context } = await init();
-	
+
 	console.log("initialization done")
 
 	context.configure({
@@ -148,19 +148,20 @@ async function main() {
 
 
 	interface simulationParam {
-		particleCount: number, 
-		initBoxSize: number[], 
-		initDistance: number, 
+		particleCount: number,
+		initBoxSize: number[],
+		initDistance: number,
 		mouseRadius: number,
-		cameraTargetY: number, 
-		guiText: string, 
+		cameraTargetY: number,
+		guiText: string,
 	}
 
 	let simulationParams: simulationParam[] = [
-		{ particleCount: 40000, initBoxSize: [60, 50, 60], initDistance: 50, mouseRadius: 15, cameraTargetY: 10, guiText: 'Small (40,000 particles)' }, 
-		{ particleCount: 70000, initBoxSize: [70, 50, 70], initDistance: 60, mouseRadius: 15, cameraTargetY: 12, guiText: 'Medium (70,000 particles)'}, 
-		{ particleCount: 100000, initBoxSize: [80, 70, 80], initDistance: 70, mouseRadius: 15, cameraTargetY: 12, guiText: 'Large (100,000 particles)'}, 
-		{ particleCount: 180000, initBoxSize: [90, 70, 90], initDistance: 80, mouseRadius: 18, cameraTargetY: 15, guiText: 'Very Large (180,000 particles)'}, 
+		{ particleCount: 40000, initBoxSize: [60, 50, 60], initDistance: 50, mouseRadius: 15, cameraTargetY: 10, guiText: 'Small (40,000 particles)' },
+		{ particleCount: 70000, initBoxSize: [70, 50, 70], initDistance: 60, mouseRadius: 15, cameraTargetY: 12, guiText: 'Medium (70,000 particles)'},
+		{ particleCount: 100000, initBoxSize: [80, 70, 80], initDistance: 70, mouseRadius: 15, cameraTargetY: 12, guiText: 'Large (100,000 particles)'},
+		{ particleCount: 180000, initBoxSize: [90, 70, 90], initDistance: 80, mouseRadius: 18, cameraTargetY: 15, guiText: 'Very Large (180,000 particles)'},
+		{ particleCount: 1000000, initBoxSize: [120, 120, 120], initDistance: 80, mouseRadius: 18, cameraTargetY: 15, guiText: 'Super'},
 	]
 	const particleCountTexts = simulationParams.map(param => param.guiText)
 	const guiParams = initGui(particleCountTexts)
@@ -170,29 +171,29 @@ async function main() {
 	// シミュレーションとレンダリングで使いまわすバッファ
 	const maxParticleStructSize = mlsmpmParticleStructSize
 	const particleBuffer = device.createBuffer({
-		label: 'particles buffer', 
-		size: maxParticleStructSize * maxParticleCount, 
+		label: 'particles buffer',
+		size: maxParticleStructSize * maxParticleCount,
 		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 	})
 	const posvelBuffer = device.createBuffer({
-		label: 'posvel buffer', 
-		size: 32 * maxParticleCount,  
+		label: 'posvel buffer',
+		size: 32 * maxParticleCount,
 		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
 	})
 	const renderUniformBuffer = device.createBuffer({
-		label: 'filter uniform buffer', 
-		size: renderUniformsValues.byteLength, 
+		label: 'filter uniform buffer',
+		size: renderUniformsValues.byteLength,
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	})
 	const initBoxSizeBuffer = device.createBuffer({
-		label: 'init box size buffer', 
+		label: 'init box size buffer',
 		size: 12,  // vec3f
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	})
 
 	// texture for depthmap
 	const depthMapTexture = device.createTexture({
-		label: 'depth map texture', 
+		label: 'depth map texture',
 		size: [canvas.width, canvas.height, 1],
 		usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
 		format: 'r32float',
@@ -206,24 +207,24 @@ async function main() {
 	const densityGridSizeZ = Math.ceil(Math.max(...simulationParams.map(param => param.initBoxSize[2])) / 128) * 128;
 	const densityGridSize = [densityGridSizeX, densityGridSizeY, densityGridSizeZ]
 	const densityGridBuffer = device.createBuffer({
-		label: 'density grid buffer', 
-		size: 4 * densityGridSizeX * densityGridSizeY * densityGridSizeZ, 
+		label: 'density grid buffer',
+		size: 4 * densityGridSizeX * densityGridSizeY * densityGridSizeZ,
 		usage: GPUBufferUsage.STORAGE, // コピー元
 	})
 	const castedDensityGridBuffer = device.createBuffer({
-		label: 'casted density grid buffer', 
-		size: 2 * densityGridSizeX * densityGridSizeY * densityGridSizeZ, 
+		label: 'casted density grid buffer',
+		size: 2 * densityGridSizeX * densityGridSizeY * densityGridSizeZ,
 		usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC, // コピー元
 	})
 	const densityGridSizeBuffer = device.createBuffer({
-		label: 'density grid size buffer', 
-		size: 12, 
-		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST, 
+		label: 'density grid size buffer',
+		size: 12,
+		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	})
 	const densityGridSizeDataArray = new Float32Array(densityGridSize)
 	device.queue.writeBuffer(densityGridSizeBuffer, 0, densityGridSizeDataArray)
-	const densityGridTexture = device.createTexture({ 
-		label: 'density grid texture', 
+	const densityGridTexture = device.createTexture({
+		label: 'density grid texture',
 		size: [densityGridSizeZ, densityGridSizeY, densityGridSizeX], // これでいい？
 		usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST, // コピー先
 		format: 'r16float',
@@ -240,17 +241,17 @@ async function main() {
 	const mlsmpmZoomRate = 0.7
 	const fixedPointMultiplier = 1e7
 	const mlsmpmSimulator = new MLSMPMSimulator(
-		particleBuffer, posvelBuffer, renderUniformBuffer, densityGridBuffer, castedDensityGridBuffer, 
-		initBoxSizeBuffer, densityGridSizeBuffer, 
-		device, depthMapTextureView, canvas, 
+		particleBuffer, posvelBuffer, renderUniformBuffer, densityGridBuffer, castedDensityGridBuffer,
+		initBoxSizeBuffer, densityGridSizeBuffer,
+		device, depthMapTextureView, canvas,
 		maxGridCount, maxParticleCount, fixedPointMultiplier, mlsmpmDiameter
 	)
 	const mlsmpmRenderer = new FluidRenderer(
-		renderUniformBuffer, posvelBuffer, densityGridSizeBuffer, initBoxSizeBuffer, 
-		device, 
-		depthMapTextureView, cubemapTextureView, densityGridTextureView, 
-		canvas, 
-		presentationFormat, 
+		renderUniformBuffer, posvelBuffer, densityGridSizeBuffer, initBoxSizeBuffer,
+		device,
+		depthMapTextureView, cubemapTextureView, densityGridTextureView,
+		canvas,
+		presentationFormat,
 		mlsmpmRadius, mlsmpmFov, fixedPointMultiplier
 	)
 
@@ -279,7 +280,7 @@ async function main() {
 	let closingSpeed = 0.
 	let prevClosingSpeed = 0.
 
-	
+
 	async function frame() {
 		const selectedValue = particleCountTexts.indexOf(guiParams.numParticles);
 		if (guiParams.running && Number(selectedValue) != paramsIdx) {
@@ -287,7 +288,7 @@ async function main() {
 			simulationParam = simulationParams[paramsIdx]
 			initBoxSize = simulationParam.initBoxSize
 			mlsmpmSimulator.reset(initBoxSize, simulationParam.particleCount)
-			camera.reset(simulationParam.initDistance, [initBoxSize[0] / 2, simulationParam.cameraTargetY, initBoxSize[2] / 2], 
+			camera.reset(simulationParam.initDistance, [initBoxSize[0] / 2, simulationParam.cameraTargetY, initBoxSize[2] / 2],
 				mlsmpmFov, mlsmpmZoomRate)
 			realBoxSize = [...initBoxSize]
 			let slider = document.getElementById("slider") as HTMLInputElement
@@ -308,7 +309,7 @@ async function main() {
 				prevClosingSpeed = 0.
 			} else {
 				prevClosingSpeed = closingSpeed
-			}	
+			}
 		}
 
 		realBoxSize[2] = initBoxSize[2] * boxWidthRatio
@@ -317,18 +318,18 @@ async function main() {
 		// matrices are written by camera.ts
 		renderUniformsViews.texelSize.set([1.0 / canvas.width, 1.0 / canvas.height]);
 		renderUniformsViews.sphereSize.set([mlsmpmDiameter])
-		device.queue.writeBuffer(renderUniformBuffer, 0, renderUniformsValues) 
+		device.queue.writeBuffer(renderUniformBuffer, 0, renderUniformsValues)
 
 		const commandEncoder = device.createCommandEncoder()
 
 		let maxDt = 0.4;
-		mlsmpmSimulator.execute(commandEncoder, 
-			[camera.currentHoverX / canvas.clientWidth, camera.currentHoverY / canvas.clientHeight], 
+		mlsmpmSimulator.execute(commandEncoder,
+			[camera.currentHoverX / canvas.clientWidth, camera.currentHoverY / canvas.clientHeight],
 			camera.calcMouseVelocity(), simulationParam.mouseRadius, sphereRenderFl, maxDt * guiParams.speed, guiParams.running,
 			densityGridSize
-		)	
+		)
 		let normalizedDiffuseColor = [guiParams.r / 255, guiParams.g / 255, guiParams.b / 255];
-		mlsmpmRenderer.execute(context, commandEncoder, mlsmpmSimulator.numParticles, sphereRenderFl, normalizedDiffuseColor, 
+		mlsmpmRenderer.execute(context, commandEncoder, mlsmpmSimulator.numParticles, sphereRenderFl, normalizedDiffuseColor,
 			guiParams.colorDensity)
 
 		device.queue.submit([commandEncoder.finish()])
@@ -361,7 +362,7 @@ async function main() {
 		}
 
 		requestAnimationFrame(frame)
-	} 
+	}
 	requestAnimationFrame(frame)
 }
 

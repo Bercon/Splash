@@ -1,16 +1,16 @@
 struct Particle {
-    position: vec3f, 
-    v: vec3f, 
-    C: mat3x3f, 
+    position: vec3f,
+    v: vec3f,
+    C: mat3x3f,
 }
 struct Cell {
-    vx: i32, 
-    vy: i32, 
-    vz: i32, 
-    mass: i32, 
+    vx: i32,
+    vy: i32,
+    vz: i32,
+    mass: i32,
 }
 
-override fixedPointMultiplierInverse: f32; 
+override fixedPointMultiplierInverse: f32;
 
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(1) var<storage, read> cells: array<Cell>;
@@ -42,23 +42,23 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
                 for (var gz = 0; gz < 3; gz++) {
                     let weight: f32 = weights[gx].x * weights[gy].y * weights[gz].z;
                     let cellX: vec3f = vec3f(
-                        cellIndex.x + f32(gx) - 1., 
+                        cellIndex.x + f32(gx) - 1.,
                         cellIndex.y + f32(gy) - 1.,
-                        cellIndex.z + f32(gz) - 1.  
+                        cellIndex.z + f32(gz) - 1.
                     );
                     let cellDist: vec3f = (cellX + 0.5f) - particle.position;
-                    let cellIndex1D: i32 = 
-                        i32(cellX.x) * i32(initBoxSize.y) * i32(initBoxSize.z) + 
-                        i32(cellX.y) * i32(initBoxSize.z) + 
+                    let cellIndex1D: i32 =
+                        i32(cellX.x) * i32(initBoxSize.y) * i32(initBoxSize.z) +
+                        i32(cellX.y) * i32(initBoxSize.z) +
                         i32(cellX.z);
                     let weighted_velocity: vec3f = vec3f(
-                        decodeFixedPoint(cells[cellIndex1D].vx), 
-                        decodeFixedPoint(cells[cellIndex1D].vy), 
+                        decodeFixedPoint(cells[cellIndex1D].vx),
+                        decodeFixedPoint(cells[cellIndex1D].vy),
                         decodeFixedPoint(cells[cellIndex1D].vz)
                     ) * weight;
                     let term: mat3x3f = mat3x3f(
-                        weighted_velocity * cellDist.x, 
-                        weighted_velocity * cellDist.y, 
+                        weighted_velocity * cellDist.x,
+                        weighted_velocity * cellDist.y,
                         weighted_velocity * cellDist.z
                     );
 
@@ -72,8 +72,8 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
         particles[id.x].C = B * 4.0f;
         particles[id.x].position += particles[id.x].v * dt;
         particles[id.x].position = vec3f(
-            clamp(particles[id.x].position.x, 1., realBoxSize.x - 2.), 
-            clamp(particles[id.x].position.y, 1., realBoxSize.y - 2.), 
+            clamp(particles[id.x].position.x, 1., realBoxSize.x - 2.),
+            clamp(particles[id.x].position.y, 1., realBoxSize.y - 2.),
             clamp(particles[id.x].position.z, 1., realBoxSize.z - 2.)
         );
 
@@ -82,7 +82,7 @@ fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
         let dirToOrigin = normalize(dist);
         var rForce = vec3f(0);
 
-        
+
         let k = 2.0;
         let wallStiffness = 1.0;
         let x_n: vec3f = particles[id.x].position + particles[id.x].v * dt * k;

@@ -1,7 +1,7 @@
 @group(0) @binding(0) var<storage, read> densityGrid: array<i32>;
 @group(0) @binding(1) var<storage, read_write> castedDensityGrid: array<u32>;
 
-override fixedPointMultiplierInverse: f32; 
+override fixedPointMultiplierInverse: f32;
 
 fn decodeFixedPoint(fixedPoint: i32) -> f32 {
 	return f32(fixedPoint) * fixedPointMultiplierInverse;

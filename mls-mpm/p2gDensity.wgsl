@@ -5,12 +5,12 @@
 @group(0) @binding(4) var<uniform> densityGridSize: vec3f;
 
 struct Particle {
-    position: vec3f, 
-    v: vec3f, 
-    C: mat3x3f, 
+    position: vec3f,
+    v: vec3f,
+    C: mat3x3f,
 }
 
-override densityFixedPointMultiplier: f32; 
+override densityFixedPointMultiplier: f32;
 
 fn encodeFixedPoint(floatingPoint: f32) -> i32 {
 	return i32(floatingPoint * densityFixedPointMultiplier);
@@ -32,13 +32,13 @@ fn p2gDensity(@builtin(global_invocation_id) id: vec3<u32>) {
                 for (var gz = 0; gz < 3; gz++) {
                     let weight: f32 = weights[gx].x * weights[gy].y * weights[gz].z;
                     let cellX: vec3f = vec3f(
-                            cellIndex.x + f32(gx) - 1., 
+                            cellIndex.x + f32(gx) - 1.,
                             cellIndex.y + f32(gy) - 1.,
-                            cellIndex.z + f32(gz) - 1.  
+                            cellIndex.z + f32(gz) - 1.
                         );
-                    let cellIndex1D: i32 = 
-                        i32(cellX.x) * i32(densityGridSize.y) * i32(densityGridSize.z) + 
-                        i32(cellX.y) * i32(densityGridSize.z) + 
+                    let cellIndex1D: i32 =
+                        i32(cellX.x) * i32(densityGridSize.y) * i32(densityGridSize.z) +
+                        i32(cellX.y) * i32(densityGridSize.z) +
                         i32(cellX.z);
                     atomicAdd(&densityGrid[cellIndex1D], encodeFixedPoint(densities[id.x] * weight));
                 }

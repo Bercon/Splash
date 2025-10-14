@@ -1,16 +1,16 @@
 struct Particle {
-    position: vec3f, 
-    v: vec3f, 
-    C: mat3x3f, 
+    position: vec3f,
+    v: vec3f,
+    C: mat3x3f,
 }
 struct Cell {
-    vx: atomic<i32>, 
-    vy: atomic<i32>, 
-    vz: atomic<i32>, 
-    mass: atomic<i32>, 
+    vx: atomic<i32>,
+    vy: atomic<i32>,
+    vz: atomic<i32>,
+    mass: atomic<i32>,
 }
 
-override fixedPointMultiplier: f32; 
+override fixedPointMultiplier: f32;
 
 fn encodeFixedPoint(floatingPoint: f32) -> i32 {
 	return i32(floatingPoint * fixedPointMultiplier);
@@ -40,9 +40,9 @@ fn p2g_1(@builtin(global_invocation_id) id: vec3<u32>) {
                 for (var gz = 0; gz < 3; gz++) {
                     let weight: f32 = weights[gx].x * weights[gy].y * weights[gz].z;
                     let cellX: vec3f = vec3f(
-                            cellIndex.x + f32(gx) - 1., 
+                            cellIndex.x + f32(gx) - 1.,
                             cellIndex.y + f32(gy) - 1.,
-                            cellIndex.z + f32(gz) - 1.  
+                            cellIndex.z + f32(gz) - 1.
                         );
                     let cellDist = (cellX + 0.5f) - particle.position;
 
@@ -50,9 +50,9 @@ fn p2g_1(@builtin(global_invocation_id) id: vec3<u32>) {
 
                     let massContrib: f32 = weight * 1.0; // assuming particle.mass = 1.0
                     let velContrib: vec3f = massContrib * (particle.v + Q);
-                    let cellIndex1D: i32 = 
-                        i32(cellX.x) * i32(initBoxSize.y) * i32(initBoxSize.z) + 
-                        i32(cellX.y) * i32(initBoxSize.z) + 
+                    let cellIndex1D: i32 =
+                        i32(cellX.x) * i32(initBoxSize.y) * i32(initBoxSize.z) +
+                        i32(cellX.y) * i32(initBoxSize.z) +
                         i32(cellX.z);
                     atomicAdd(&cells[cellIndex1D].mass, encodeFixedPoint(massContrib));
                     atomicAdd(&cells[cellIndex1D].vx, encodeFixedPoint(velContrib.x));

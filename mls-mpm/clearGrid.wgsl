@@ -1,8 +1,8 @@
 struct Cell {
-    vx: i32, 
-    vy: i32, 
-    vz: i32, 
-    mass: i32, 
+    vx: i32,
+    vy: i32,
+    vz: i32,
+    mass: i32,
 }
 
 @group(0) @binding(0) var<storage, read_write> cells: array<Cell>;
