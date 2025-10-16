@@ -10,11 +10,11 @@ struct Cell {
     mass: atomic<i32>,
 }
 
-override fixedPointMultiplier: f32;
+// override fixedPointMultiplier: f32;
 
-fn encodeFixedPoint(floatingPoint: f32) -> i32 {
-	return i32(floatingPoint * fixedPointMultiplier);
-}
+// fn encodeFixedPoint(floatingPoint: f32) -> i32 {
+// 	return i32(floatingPoint * fixedPointMultiplier);
+// }
 
 @group(0) @binding(0) var<storage, read> particles: array<Particle>;
 @group(0) @binding(1) var<storage, read_write> cells: array<Cell>;

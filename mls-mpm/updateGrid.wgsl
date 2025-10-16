@@ -19,8 +19,8 @@ struct MouseInfo {
     mouseRadius: f32,
 }
 
-override fixedPointMultiplier: f32;
-override fixedPointMultiplierInverse: f32;
+// override fixedPointMultiplier: f32;
+// override fixedPointMultiplierInverse: f32;
 
 @group(0) @binding(0) var<storage, read_write> cells: array<Cell>;
 @group(0) @binding(1) var<uniform> realBoxSize: vec3f;
@@ -30,12 +30,12 @@ override fixedPointMultiplierInverse: f32;
 @group(0) @binding(5) var<uniform> mouseInfo: MouseInfo;
 @group(0) @binding(6) var<uniform> dt: f32;
 
-fn encodeFixedPoint(floatingPoint: f32) -> i32 {
-	return i32(floatingPoint * fixedPointMultiplier);
-}
-fn decodeFixedPoint(fixedPoint: i32) -> f32 {
-	return f32(fixedPoint) * fixedPointMultiplierInverse;
-}
+// fn encodeFixedPoint(floatingPoint: f32) -> i32 {
+// 	return i32(floatingPoint * fixedPointMultiplier);
+// }
+// fn decodeFixedPoint(fixedPoint: i32) -> f32 {
+// 	return f32(fixedPoint) * fixedPointMultiplierInverse;
+// }
 
 fn computeViewPosFromUVDepth(tex_coord: vec2f, depth: f32) -> vec3f {
     var ndc: vec4f = vec4f(tex_coord.x * 2.0 - 1.0, 1.0 - 2.0 * tex_coord.y, 0.0, 1.0);

@@ -10,11 +10,11 @@ struct Particle {
     C: mat3x3f,
 }
 
-override densityFixedPointMultiplier: f32;
+// override densityFixedPointMultiplier: f32;
 
-fn encodeFixedPoint(floatingPoint: f32) -> i32 {
-	return i32(floatingPoint * densityFixedPointMultiplier);
-}
+// fn encodeFixedPoint(floatingPoint: f32) -> i32 {
+// 	return i32(floatingPoint * densityFixedPointMultiplier);
+// }
 
 @compute @workgroup_size(64)
 fn p2gDensity(@builtin(global_invocation_id) id: vec3<u32>) {
