@@ -4,9 +4,6 @@ import p2g_2 from './p2g_2.wgsl'
 import updateGrid from './updateGrid.wgsl'
 import g2p from './g2p.wgsl'
 import copyPosition from './copyPosition.wgsl'
-import p2gDensity from './p2gDensity.wgsl'
-import clearDensityGrid from './clearDensityGrid.wgsl'
-import castDensityGrid from './castDensityGrid.wgsl'
 import commonWgsl from './common.wgsl'
 
 export const mlsmpmParticleStructSize = 80
@@ -87,11 +84,8 @@ export class MLSMPMSimulator {
         const createMod = (code) => device.createShaderModule({ code: templateCode(code) });
 
         const clearGridModule = createMod(clearGrid);
-        const clearDensityGridModule = createMod(clearDensityGrid);
-        const castDensityGridModule = createMod(castDensityGrid);
         const p2g1Module = createMod(p2g_1);
         const p2g2Module = createMod(p2g_2);
-        const p2gDensityModule = createMod(p2gDensity);
         const updateGridModule = createMod(updateGrid);
         const g2pModule = createMod(g2p);
         const copyPositionModule = createMod(copyPosition);
@@ -113,20 +107,6 @@ stiffness
                 module: clearGridModule,
             }
         })
-        this.clearDensityGridPipeline = device.createComputePipeline({
-            label: "clear density grid pipeline",
-            layout: 'auto',
-            compute: {
-                module: clearDensityGridModule,
-            }
-        })
-        this.castDensityGridPipeline = device.createComputePipeline({
-            label: "cast density grid pipeline",
-            layout: 'auto',
-            compute: {
-                module: castDensityGridModule,
-            }
-        })
         this.p2g1Pipeline = device.createComputePipeline({
             label: "p2g 1 pipeline",
             layout: 'auto',
@@ -139,13 +119,6 @@ stiffness
             layout: 'auto',
             compute: {
                 module: p2g2Module,
-            }
-        })
-        this.p2gDensityPipeline = device.createComputePipeline({
-            label: "p2g density pipeline",
-            layout: 'auto',
-            compute: {
-                module: p2gDensityModule,
             }
         })
         this.updateGridPipeline = device.createComputePipeline({
@@ -216,20 +189,6 @@ stiffness
               { binding: 0, resource: { buffer: cellBuffer }},
             ],
         })
-        this.clearDensityGridBindGroup = device.createBindGroup({
-            layout: this.clearDensityGridPipeline.getBindGroupLayout(0),
-            entries: [
-              { binding: 0, resource: { buffer: densityGridBuffer }},
-              { binding: 1, resource: { buffer: castedDensityGridBuffer }},
-            ],
-        })
-        this.castDensityGridBindGroup = device.createBindGroup({
-            layout: this.castDensityGridPipeline.getBindGroupLayout(0),
-            entries: [
-              { binding: 0, resource: { buffer: densityGridBuffer }},
-              { binding: 1, resource: { buffer: castedDensityGridBuffer }},
-            ],
-        })
         this.p2g1BindGroup = device.createBindGroup({
             layout: this.p2g1Pipeline.getBindGroupLayout(0),
             entries: [
@@ -248,16 +207,6 @@ stiffness
                 { binding: 3, resource: { buffer: this.numParticlesBuffer }},
                 { binding: 4, resource: { buffer: this.densityBuffer }},
                 { binding: 5, resource: { buffer: this.dtBuffer }},
-            ]
-        })
-        this.p2gDensityBindGroup = device.createBindGroup({
-            layout: this.p2gDensityPipeline.getBindGroupLayout(0),
-            entries: [
-                { binding: 0, resource: { buffer: particleBuffer }},
-                { binding: 1, resource: { buffer: this.densityBuffer }},
-                { binding: 2, resource: { buffer: this.numParticlesBuffer }},
-                { binding: 3, resource: { buffer: densityGridBuffer }},
-                { binding: 4, resource: { buffer: densityGridSizeBuffer }}
             ]
         })
         this.updateGridBindGroup = device.createBindGroup({
@@ -361,68 +310,24 @@ stiffness
         const dtArray = new Float32Array([dt])
         this.device.queue.writeBuffer(this.dtBuffer, 0, dtArray)
 
-
-        if (!densityGridFlag) { // 通常
-            if (running) {
-                for (let i = 0; i < 1; i++) {  // single timestep!!!
-                    computePass.setBindGroup(0, this.clearGridBindGroup);
-                    computePass.setPipeline(this.clearGridPipeline);
-                    computePass.dispatchWorkgroups(Math.ceil(this.gridCount / 64))
-                    computePass.setBindGroup(0, this.p2g1BindGroup)
-                    computePass.setPipeline(this.p2g1Pipeline)
-                    computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
-                    computePass.setBindGroup(0, this.p2g2BindGroup)
-                    computePass.setPipeline(this.p2g2Pipeline)
-                    computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
-                    computePass.setBindGroup(0, this.updateGridBindGroup)
-                    computePass.setPipeline(this.updateGridPipeline)
-                    computePass.dispatchWorkgroups(Math.ceil(this.gridCount / 64))
-                    computePass.setBindGroup(0, this.g2pBindGroup)
-                    computePass.setPipeline(this.g2pPipeline)
-                    computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
-                }
-                computePass.setBindGroup(0, this.copyPositionBindGroup)
-                computePass.setPipeline(this.copyPositionPipeline)
+        if (running) {
+            for (let i = 0; i < 1; i++) {  // single timestep!!!
+                computePass.setBindGroup(0, this.clearGridBindGroup);
+                computePass.setPipeline(this.clearGridPipeline);
+                computePass.dispatchWorkgroups(Math.ceil(this.gridCount / 64))
+                computePass.setBindGroup(0, this.p2g1BindGroup)
+                computePass.setPipeline(this.p2g1Pipeline)
+                computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
+                computePass.setBindGroup(0, this.p2g2BindGroup)
+                computePass.setPipeline(this.p2g2Pipeline)
+                computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
+                computePass.setBindGroup(0, this.updateGridBindGroup)
+                computePass.setPipeline(this.updateGridPipeline)
+                computePass.dispatchWorkgroups(Math.ceil(this.gridCount / 64))
+                computePass.setBindGroup(0, this.g2pBindGroup)
+                computePass.setPipeline(this.g2pPipeline)
                 computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
             }
-        } else { // density grid を更新する場合
-            if (running) {
-                for (let i = 0; i < 1; i++) {  // single timestep!!!
-                    computePass.setBindGroup(0, this.clearGridBindGroup);
-                    computePass.setPipeline(this.clearGridPipeline);
-                    computePass.dispatchWorkgroups(Math.ceil(this.gridCount / 64))
-                    computePass.setBindGroup(0, this.p2g1BindGroup)
-                    computePass.setPipeline(this.p2g1Pipeline)
-                    computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
-                    computePass.setBindGroup(0, this.p2g2BindGroup)
-                    computePass.setPipeline(this.p2g2Pipeline)
-                    computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
-                    computePass.setBindGroup(0, this.updateGridBindGroup)
-                    computePass.setPipeline(this.updateGridPipeline)
-                    computePass.dispatchWorkgroups(Math.ceil(this.gridCount / 64))
-                    computePass.setBindGroup(0, this.g2pBindGroup)
-                    computePass.setPipeline(this.g2pPipeline)
-                    computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
-                }
-            }
-            let maxDensityGridCount = densityGridSize[0] * densityGridSize[1] * densityGridSize[2];
-            // density grid をクリア
-            computePass.setBindGroup(0, this.clearDensityGridBindGroup)
-            computePass.setPipeline(this.clearDensityGridPipeline)
-            computePass.dispatchWorkgroups(Math.ceil((maxDensityGridCount / 2) / 64))
-            // computePass.dispatchWorkgroups(Math.ceil(this.maxGridCount / 64)) // TODO : 高速化
-
-            // density grid の p2g
-            computePass.setBindGroup(0, this.p2gDensityBindGroup)
-            computePass.setPipeline(this.p2gDensityPipeline)
-            computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
-
-            // density grid を f32 にキャスト
-            computePass.setBindGroup(0, this.castDensityGridBindGroup)
-            computePass.setPipeline(this.castDensityGridPipeline)
-            computePass.dispatchWorkgroups(Math.ceil((maxDensityGridCount / 2) / 64))
-            // computePass.dispatchWorkgroups(Math.ceil(this.maxGridCount / 64)) // TODO : 高速化
-
             computePass.setBindGroup(0, this.copyPositionBindGroup)
             computePass.setPipeline(this.copyPositionPipeline)
             computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
