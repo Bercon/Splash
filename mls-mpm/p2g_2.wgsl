@@ -12,9 +12,9 @@ struct Cell {
 
 // override fixedPointMultiplier: f32;
 // override fixedPointMultiplierInverse: f32;
-override stiffness: f32;
-override restDensity: f32;
-override dynamicViscosity: f32;
+// override stiffness: f32;
+// override restDensity: f32;
+// override dynamicViscosity: f32;
 
 // fn encodeFixedPoint(floatingPoint: f32) -> i32 {
 // 	return i32(floatingPoint * fixedPointMultiplier);

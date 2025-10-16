@@ -6,3 +6,7 @@ fn encodeFixedPoint(v: f32) -> i32 {
 fn decodeFixedPoint(i: i32) -> f32 {
     return f32(i) * SCALE_INV;
 }
+
+const dynamicViscosity : f32 = 0.1;
+const restDensity : f32 = 3.0;
+const stiffness : f32 = 50.0;
