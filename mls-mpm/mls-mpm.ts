@@ -5,6 +5,7 @@ import updateGrid from './updateGrid.wgsl'
 import g2p from './g2p.wgsl'
 import copyPosition from './copyPosition.wgsl'
 import commonWgsl from './common.wgsl'
+import resetParticlesWgsl from './resetParticles.wgsl'
 
 export const mlsmpmParticleStructSize = 80
 
@@ -79,6 +80,7 @@ export class MLSMPMSimulator {
         this.maxGridCount = maxGridCount
         this.maxParticleCount = maxParticleCount
         this.initBoxSizeBuffer = initBoxSizeBuffer
+        this.initParticles = true;
 
         const templateCode = (code) => { return  commonWgsl + code; }
         const createMod = (code) => device.createShaderModule({ code: templateCode(code) });
@@ -89,6 +91,7 @@ export class MLSMPMSimulator {
         const updateGridModule = createMod(updateGrid);
         const g2pModule = createMod(g2p);
         const copyPositionModule = createMod(copyPosition);
+        const resetParticlesModule = createMod(resetParticlesWgsl);
 
         this.clearGridPipeline = device.createComputePipeline({
             label: "clear grid pipeline",
@@ -130,6 +133,14 @@ export class MLSMPMSimulator {
             layout: 'auto',
             compute: {
                 module: copyPositionModule,
+            }
+        });
+
+        this.resetParticlesPipeline = device.createComputePipeline({
+            label: "resetParticlesModule",
+            layout: 'auto',
+            compute: {
+                module: resetParticlesModule,
             }
         });
 
@@ -231,6 +242,16 @@ export class MLSMPMSimulator {
             ]
         })
 
+        this.resetParticlesBindGroup = device.createBindGroup({
+            layout: this.resetParticlesPipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: { buffer: particleBuffer }},
+                { binding: 1, resource: { buffer: this.initBoxSizeBuffer }},
+                { binding: 2, resource: { buffer: this.numParticlesBuffer }},
+            ]
+        })
+
+
         this.particleBuffer = particleBuffer
         this.densityGridBuffer = densityGridBuffer
     }
@@ -239,30 +260,33 @@ export class MLSMPMSimulator {
         let particlesBuf = new ArrayBuffer(mlsmpmParticleStructSize * this.maxParticleCount);
         const spacing = 0.9 ;
 
-        this.numParticles = 0;
+        this.numParticles = numParticles;
 
         let sphereCenter = [initBoxSize[0] / 2, initBoxSize[0] / 2, initBoxSize[2] / 2]
 
-        for (let j = 3; j < initBoxSize[1] * 0.80 && this.numParticles < numParticles; j += spacing) {
-            for (let i = initBoxSize[0] * 0.25; i < initBoxSize[0] - 4 && this.numParticles < numParticles; i += spacing) {
-                for (let k = 3; k < initBoxSize[2] / 2 && this.numParticles < numParticles; k += spacing) {
-                    const offset = mlsmpmParticleStructSize * this.numParticles;
-                    const particleViews = {
-                        position: new Float32Array(particlesBuf, offset + 0, 3),
-                        v: new Float32Array(particlesBuf, offset + 16, 3),
-                        C: new Float32Array(particlesBuf, offset + 32, 12),
-                    };
-                    const jitter = 0.5 * Math.random();
-                    particleViews.position.set([i + jitter, j + jitter, k + jitter]);
-                    this.numParticles++;
-                }
-            }
-        }
+        console.log(initBoxSize);
 
-        console.log(this.numParticles)
-        if (this.numParticles < numParticles) {
-            console.log("warning: actual number of particles is smaller than the specified number. make bounding box larger.")
-        }
+        // for (let j = 3; j < initBoxSize[1] * 0.80 && this.numParticles < numParticles; j += spacing) {
+        //     for (let i = initBoxSize[0] * 0.25; i < initBoxSize[0] - 4 && this.numParticles < numParticles; i += spacing) {
+        //         for (let k = 3; k < initBoxSize[2] / 2 && this.numParticles < numParticles; k += spacing) {
+        //             const offset = mlsmpmParticleStructSize * this.numParticles;
+        //             const particleViews = {
+        //                 position: new Float32Array(particlesBuf, offset + 0, 3),
+        //                 v: new Float32Array(particlesBuf, offset + 16, 3),
+        //                 C: new Float32Array(particlesBuf, offset + 32, 12),
+        //             };
+        //             const jitter = 0.5 * Math.random();
+        //             particleViews.position.set([i + jitter, j + jitter, k + jitter]);
+        //             // console.log([i + jitter, j + jitter, k + jitter]);
+        //             this.numParticles++;
+        //         }
+        //     }
+        // }
+
+        // console.log(this.numParticles)
+        // if (this.numParticles < numParticles) {
+        //     console.log("warning: actual number of particles is smaller than the specified number. make bounding box larger.")
+        // }
 
         let particles = new ArrayBuffer(mlsmpmParticleStructSize * this.numParticles);
         const oldView = new Uint8Array(particlesBuf);
@@ -285,6 +309,7 @@ export class MLSMPMSimulator {
         this.device.queue.writeBuffer(this.particleBuffer, 0, particles)
         this.changeBoxSize(initBoxSize)
         this.changeNumParticles(this.numParticles)
+        this.initParticles = true;
     }
 
     execute(commandEncoder: GPUCommandEncoder, mouseCoord: number[], mouseVel: number[], mouseRadius: number,
@@ -302,7 +327,14 @@ export class MLSMPMSimulator {
         this.device.queue.writeBuffer(this.dtBuffer, 0, dtArray)
 
         if (running) {
-            for (let i = 0; i < 1; i++) {  // single timestep!!!
+            // for (let i = 0; i < 1; i++) {  // single timestep!!!
+                if (this.initParticles) {
+                    computePass.setBindGroup(0, this.resetParticlesBindGroup)
+                    computePass.setPipeline(this.resetParticlesPipeline)
+                    computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
+                    this.initParticles = false;
+                }
+
                 computePass.setBindGroup(0, this.clearGridBindGroup);
                 computePass.setPipeline(this.clearGridPipeline);
                 computePass.dispatchWorkgroups(Math.ceil(this.gridCount / 64))
@@ -318,7 +350,7 @@ export class MLSMPMSimulator {
                 computePass.setBindGroup(0, this.g2pBindGroup)
                 computePass.setPipeline(this.g2pPipeline)
                 computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))
-            }
+            // }
             computePass.setBindGroup(0, this.copyPositionBindGroup)
             computePass.setPipeline(this.copyPositionPipeline)
             computePass.dispatchWorkgroups(Math.ceil(this.numParticles / 64))

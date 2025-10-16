@@ -161,6 +161,7 @@ async function main() {
 		{ particleCount: 70000, initBoxSize: [70, 50, 70], initDistance: 60, mouseRadius: 15, cameraTargetY: 12, guiText: 'Medium (70,000 particles)'},
 		{ particleCount: 100000, initBoxSize: [80, 70, 80], initDistance: 70, mouseRadius: 15, cameraTargetY: 12, guiText: 'Large (100,000 particles)'},
 		{ particleCount: 180000, initBoxSize: [90, 70, 90], initDistance: 80, mouseRadius: 18, cameraTargetY: 15, guiText: 'Very Large (180,000 particles)'},
+		{ particleCount: 360000, initBoxSize: [90, 70, 90], initDistance: 80, mouseRadius: 18, cameraTargetY: 15, guiText: 'Very Large (360,000 particles)'},
 		{ particleCount: 1000000, initBoxSize: [120, 120, 120], initDistance: 80, mouseRadius: 18, cameraTargetY: 15, guiText: 'Super'},
 	]
 	const particleCountTexts = simulationParams.map(param => param.guiText)
