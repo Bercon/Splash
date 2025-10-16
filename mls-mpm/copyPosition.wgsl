@@ -1,14 +1,3 @@
-struct Particle {
-    position: vec3f,
-    v: vec3f,
-    C: mat3x3f,
-}
-
-struct PosVel {
-    position: vec3f,
-    v: vec3f,
-}
-
 @group(0) @binding(0) var<storage, read> particles: array<Particle>;
 @group(0) @binding(1) var<storage, read_write> posvel: array<PosVel>;
 @group(0) @binding(2) var<uniform> numParticles: u32;

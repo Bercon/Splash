@@ -1,9 +1,3 @@
-struct Cell {
-    vx: i32,
-    vy: i32,
-    vz: i32,
-    mass: i32,
-}
 struct RenderUniforms {
     texelSize: vec2f,
     sphereSize: f32,

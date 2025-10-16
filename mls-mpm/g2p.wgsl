@@ -1,27 +1,9 @@
-struct Particle {
-    position: vec3f,
-    v: vec3f,
-    C: mat3x3f,
-}
-struct Cell {
-    vx: i32,
-    vy: i32,
-    vz: i32,
-    mass: i32,
-}
-
-// override fixedPointMultiplierInverse: f32;
-
 @group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
 @group(0) @binding(1) var<storage, read> cells: array<Cell>;
 @group(0) @binding(2) var<uniform> realBoxSize: vec3f;
 @group(0) @binding(3) var<uniform> initBoxSize: vec3f;
 @group(0) @binding(4) var<uniform> numParticles: u32;
 @group(0) @binding(5) var<uniform> dt: f32;
-
-// fn decodeFixedPoint(fixedPoint: i32) -> f32 {
-// 	return f32(fixedPoint) * fixedPointMultiplierInverse;
-// }
 
 @compute @workgroup_size(64)
 fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {

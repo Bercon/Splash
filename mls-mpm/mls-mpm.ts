@@ -90,16 +90,6 @@ export class MLSMPMSimulator {
         const g2pModule = createMod(g2p);
         const copyPositionModule = createMod(copyPosition);
 
-dynamicViscosity
-:
-0.1
-restDensity
-:
-3
-stiffness
-:
-50
-
         this.clearGridPipeline = device.createComputePipeline({
             label: "clear grid pipeline",
             layout: 'auto',

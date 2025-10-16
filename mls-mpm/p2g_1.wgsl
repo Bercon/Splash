@@ -1,17 +1,5 @@
-struct Particle {
-    position: vec3f,
-    v: vec3f,
-    C: mat3x3f,
-}
-struct Cell {
-    vx: atomic<i32>,
-    vy: atomic<i32>,
-    vz: atomic<i32>,
-    mass: atomic<i32>,
-}
-
 @group(0) @binding(0) var<storage, read> particles: array<Particle>;
-@group(0) @binding(1) var<storage, read_write> cells: array<Cell>;
+@group(0) @binding(1) var<storage, read_write> cells: array<AtomicCell>;
 @group(0) @binding(2) var<uniform> initBoxSize: vec3f;
 @group(0) @binding(3) var<uniform> numParticles: u32;
 
