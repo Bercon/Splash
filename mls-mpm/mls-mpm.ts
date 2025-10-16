@@ -205,8 +205,8 @@ export class MLSMPMSimulator {
                 { binding: 0, resource: { buffer: cellBuffer }},
                 { binding: 1, resource: { buffer: this.realBoxSizeBuffer }},
                 { binding: 2, resource: { buffer: initBoxSizeBuffer }},
-                { binding: 3, resource: { buffer: renderUniformBuffer }},
-                { binding: 4, resource: depthMapTextureView },
+                // { binding: 3, resource: { buffer: renderUniformBuffer }},
+                // { binding: 4, resource: depthMapTextureView },
                 { binding: 5, resource: { buffer: this.mouseInfoUniformBuffer }},
                 { binding: 6, resource: { buffer: this.dtBuffer }},
             ],
@@ -297,6 +297,7 @@ export class MLSMPMSimulator {
         this.mouseInfoViews.mouseRadius.set([mouseRadius])
         this.device.queue.writeBuffer(this.mouseInfoUniformBuffer, 0, this.mouseInfoValues);
 
+        // console.log(dt);
         const dtArray = new Float32Array([dt])
         this.device.queue.writeBuffer(this.dtBuffer, 0, dtArray)
 
