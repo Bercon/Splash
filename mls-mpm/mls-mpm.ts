@@ -206,8 +206,7 @@ export class MLSMPMSimulator {
                 { binding: 1, resource: { buffer: cellBuffer }},
                 { binding: 2, resource: { buffer: initBoxSizeBuffer }},
                 { binding: 3, resource: { buffer: this.numParticlesBuffer }},
-                { binding: 4, resource: { buffer: this.densityBuffer }},
-                { binding: 5, resource: { buffer: this.dtBuffer }},
+                { binding: 4, resource: { buffer: this.dtBuffer }},
             ]
         })
         this.updateGridBindGroup = device.createBindGroup({

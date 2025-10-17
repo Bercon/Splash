@@ -2,8 +2,7 @@
 @group(0) @binding(1) var<storage, read_write> cells: array<AtomicCellWithoutMass>;
 @group(0) @binding(2) var<uniform> initBoxSize: vec3f;
 @group(0) @binding(3) var<uniform> numParticles: u32;
-@group(0) @binding(4) var<storage, read_write> densities: array<f32>;
-@group(0) @binding(5) var<uniform> dt: f32;
+@group(0) @binding(4) var<uniform> dt: f32;
 
 @compute @workgroup_size(64)
 fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
@@ -37,7 +36,7 @@ fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
         }
 
         let volume: f32 = 1.0 / density; // particle.mass = 1.0;
-        densities[id.x] = density;
+        // densities[id.x] = density;
 
         let pressure: f32 = max(-0.0, stiffness * (pow(density / restDensity, 1.) - 1));
 
