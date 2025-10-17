@@ -216,10 +216,7 @@ export class MLSMPMSimulator {
                 { binding: 0, resource: { buffer: cellBuffer }},
                 { binding: 1, resource: { buffer: this.realBoxSizeBuffer }},
                 { binding: 2, resource: { buffer: initBoxSizeBuffer }},
-                // { binding: 3, resource: { buffer: renderUniformBuffer }},
-                // { binding: 4, resource: depthMapTextureView },
-                { binding: 5, resource: { buffer: this.mouseInfoUniformBuffer }},
-                { binding: 6, resource: { buffer: this.dtBuffer }},
+                { binding: 3, resource: { buffer: this.dtBuffer }},
             ],
         })
         this.g2pBindGroup = device.createBindGroup({
