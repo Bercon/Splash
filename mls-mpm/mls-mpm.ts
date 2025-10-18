@@ -1,68 +1,31 @@
 export const mlsmpmParticleStructSize = 80
 
 export class MLSMPMSimulator {
-    cellStructSize = 16;
-    realBoxSizeBuffer: GPUBuffer
-    numParticlesBuffer: GPUBuffer
-    densityBuffer: GPUBuffer
-    mouseInfoUniformBuffer: GPUBuffer
-    sphereRadiusBuffer: GPUBuffer
-    initBoxSizeBuffer: GPUBuffer
-    numParticles = 0
-    gridCount = 0
-    maxGridCount = 0
-    maxParticleCount = 0
-    densityGridCount = 0
-
-    clearGridPipeline: GPUComputePipeline
-    clearDensityGridPipeline: GPUComputePipeline
-    castDensityGridPipeline: GPUComputePipeline
-    p2g1Pipeline: GPUComputePipeline
-    p2g2Pipeline: GPUComputePipeline
-    p2gDensityPipeline: GPUComputePipeline
-    updateGridPipeline: GPUComputePipeline
-    g2pPipeline: GPUComputePipeline
-    copyPositionPipeline: GPUComputePipeline
-
-    clearGridBindGroup: GPUBindGroup
-    clearDensityGridBindGroup: GPUBindGroup
-    castDensityGridBindGroup: GPUBindGroup
-    p2g1BindGroup: GPUBindGroup
-    p2g2BindGroup: GPUBindGroup
-    p2gDensityBindGroup: GPUBindGroup
-    updateGridBindGroup: GPUBindGroup
-    g2pBindGroup: GPUBindGroup
-    copyPositionBindGroup: GPUBindGroup
-
-    particleBuffer: GPUBuffer
-    dtBuffer: GPUBuffer
-    densityGridBuffer: GPUBuffer
-
-    device: GPUDevice
-
-    renderDiameter: number
-
-    frameCount: number
-
-    spawned: boolean
-
-    mouseInfoValues = new ArrayBuffer(32)
-    mouseInfoViews = {
-        screenSize: new Float32Array(this.mouseInfoValues, 0, 2),
-        mouseCoord: new Float32Array(this.mouseInfoValues, 8, 2),
-        mouseVel: new Float32Array(this.mouseInfoValues, 16, 2),
-        mouseRadius: new Float32Array(this.mouseInfoValues, 24, 1),
-    };
-
-    restDensity: number
-
     constructor (
-                particleBuffer: GPUBuffer, posvelBuffer: GPUBuffer, renderUniformBuffer: GPUBuffer,
-                densityGridBuffer: GPUBuffer, castedDensityGridBuffer: GPUBuffer, initBoxSizeBuffer: GPUBuffer, densityGridSizeBuffer: GPUBuffer,
-                device: GPUDevice, depthMapTextureView: GPUTextureView, canvas: HTMLCanvasElement,
-                maxGridCount: number, maxParticleCount: number, fixedPointMultiplier: number, renderDiameter: number,
+                particleBuffer,
+                posvelBuffer,
+                renderUniformBuffer,
+                densityGridBuffer,
+                castedDensityGridBuffer,
+                initBoxSizeBuffer,
+                densityGridSizeBuffer,
+                device,
+                depthMapTextureView,
+                canvas,
+                maxGridCount,
+                maxParticleCount,
+                fixedPointMultiplier,
+                renderDiameter,
         )
     {
+        this.cellStructSize = 16;
+        this.numParticles = 0
+        this.gridCount = 0
+        this.maxGridCount = 0
+        this.maxParticleCount = 0
+        this.densityGridCount = 0
+
+
         this.device = device
         this.renderDiameter = renderDiameter
         this.frameCount = 0
@@ -478,11 +441,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             size: 4, // 1 x f32
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
-        this.mouseInfoUniformBuffer = device.createBuffer({
-            label: 'mouse info buffer',
-            size: this.mouseInfoValues.byteLength,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        })
+        // this.mouseInfoUniformBuffer = device.createBuffer({
+        //     label: 'mouse info buffer',
+        //     size: this.mouseInfoValues.byteLength,
+        //     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        // })
         this.sphereRadiusBuffer = device.createBuffer({
             label: 'sphere radius buffer',
             size: 4, // 1 x f32
@@ -494,8 +457,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
 
-        this.mouseInfoViews.screenSize.set([canvas.width, canvas.height]);
-        this.device.queue.writeBuffer(this.mouseInfoUniformBuffer, 0, this.mouseInfoValues);
+        // this.mouseInfoViews.screenSize.set([canvas.width, canvas.height]);
+        // this.device.queue.writeBuffer(this.mouseInfoUniformBuffer, 0, this.mouseInfoValues);
 
         // BindGroup
         this.clearGridBindGroup = device.createBindGroup({
@@ -566,47 +529,17 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         this.densityGridBuffer = densityGridBuffer
     }
 
-    initDambreak(initBoxSize: number[], numParticles: number) {
+    initDambreak(initBoxSize, numParticles) {
         let particlesBuf = new ArrayBuffer(mlsmpmParticleStructSize * this.maxParticleCount);
-        const spacing = 0.9 ;
-
         this.numParticles = numParticles;
-
-        let sphereCenter = [initBoxSize[0] / 2, initBoxSize[0] / 2, initBoxSize[2] / 2]
-
-        console.log(initBoxSize);
-
-        // for (let j = 3; j < initBoxSize[1] * 0.80 && this.numParticles < numParticles; j += spacing) {
-        //     for (let i = initBoxSize[0] * 0.25; i < initBoxSize[0] - 4 && this.numParticles < numParticles; i += spacing) {
-        //         for (let k = 3; k < initBoxSize[2] / 2 && this.numParticles < numParticles; k += spacing) {
-        //             const offset = mlsmpmParticleStructSize * this.numParticles;
-        //             const particleViews = {
-        //                 position: new Float32Array(particlesBuf, offset + 0, 3),
-        //                 v: new Float32Array(particlesBuf, offset + 16, 3),
-        //                 C: new Float32Array(particlesBuf, offset + 32, 12),
-        //             };
-        //             const jitter = 0.5 * Math.random();
-        //             particleViews.position.set([i + jitter, j + jitter, k + jitter]);
-        //             // console.log([i + jitter, j + jitter, k + jitter]);
-        //             this.numParticles++;
-        //         }
-        //     }
-        // }
-
-        // console.log(this.numParticles)
-        // if (this.numParticles < numParticles) {
-        //     console.log("warning: actual number of particles is smaller than the specified number. make bounding box larger.")
-        // }
-
         let particles = new ArrayBuffer(mlsmpmParticleStructSize * this.numParticles);
         const oldView = new Uint8Array(particlesBuf);
         const newView = new Uint8Array(particles);
         newView.set(oldView.subarray(0, newView.length));
-
         return particles;
     }
 
-    reset(initBoxSize: number[], numParticles: number) {
+    reset(initBoxSize, numParticles) {
         this.gridCount = Math.ceil(initBoxSize[0]) * Math.ceil(initBoxSize[1]) * Math.ceil(initBoxSize[2])
         if (this.gridCount > this.maxGridCount) {
             throw new Error("gridCount should be equal to or less than maxGridCount")
@@ -622,16 +555,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         this.initParticles = true;
     }
 
-    execute(commandEncoder: GPUCommandEncoder, mouseCoord: number[], mouseVel: number[], mouseRadius: number,
-        densityGridFlag: boolean, dt: number, running: boolean, densityGridSize: number[]
+    execute(commandEncoder, mouseCoord, mouseVel, mouseRadius,
+        densityGridFlag, dt, running, densityGridSize
     ) {
         const computePass = commandEncoder.beginComputePass();
-
-        this.mouseInfoViews.mouseCoord.set([mouseCoord[0], mouseCoord[1]])
-        this.mouseInfoViews.mouseVel.set([mouseVel[0], mouseVel[1]])
-        this.mouseInfoViews.mouseRadius.set([mouseRadius])
-        this.device.queue.writeBuffer(this.mouseInfoUniformBuffer, 0, this.mouseInfoValues);
-
         // console.log(dt);
         const dtArray = new Float32Array([dt])
         this.device.queue.writeBuffer(this.dtBuffer, 0, dtArray)
@@ -671,12 +598,12 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         this.frameCount++;
     }
 
-    changeBoxSize(realBoxSize: number[]) {
+    changeBoxSize(realBoxSize) {
         const realBoxSizeArray = new Float32Array(realBoxSize);
         this.device.queue.writeBuffer(this.realBoxSizeBuffer, 0, realBoxSizeArray)
     }
 
-    changeNumParticles(numParticles: number) {
+    changeNumParticles(numParticles) {
         const numParticlesArray = new Int32Array([numParticles])
         this.device.queue.writeBuffer(this.numParticlesBuffer, 0, numParticlesArray)
         this.numParticles = numParticles
