@@ -1,12 +1,3 @@
-import clearGrid from './clearGrid.wgsl'
-import p2g_1 from './p2g_1.wgsl'
-import p2g_2 from './p2g_2.wgsl'
-import updateGrid from './updateGrid.wgsl'
-import g2p from './g2p.wgsl'
-import copyPosition from './copyPosition.wgsl'
-import commonWgsl from './common.wgsl'
-import resetParticlesWgsl from './resetParticles.wgsl'
-
 export const mlsmpmParticleStructSize = 80
 
 export class MLSMPMSimulator {
@@ -82,16 +73,339 @@ export class MLSMPMSimulator {
         this.initBoxSizeBuffer = initBoxSizeBuffer
         this.initParticles = true;
 
+        const commonWgsl = /*wgsl*/`
+const SCALE : f32 = 65536.0; // 2^16 fixed point
+const SCALE_INV : f32 = 1.0 / SCALE;
+fn encodeFixedPoint(v: f32) -> i32 {
+    return i32(v * SCALE + 0.5);
+}
+fn decodeFixedPoint(i: i32) -> f32 {
+    return f32(i) * SCALE_INV;
+}
+
+const dynamicViscosity : f32 = 0.1;
+const restDensity : f32 = 3.0;
+const stiffness : f32 = 50.0;
+
+struct Particle {
+    position: vec3f,
+    pad1: f32,
+    v: vec3f,
+    pad2: f32,
+    C: mat3x3f,
+}
+struct Cell {
+    vx: i32,
+    vy: i32,
+    vz: i32,
+    mass: i32,
+}
+
+struct AtomicCell {
+    vx: atomic<i32>,
+    vy: atomic<i32>,
+    vz: atomic<i32>,
+    mass: atomic<i32>,
+}
+
+struct AtomicCellWithoutMass {
+    vx: atomic<i32>,
+    vy: atomic<i32>,
+    vz: atomic<i32>,
+    mass: i32,
+}
+
+struct PosVel {
+    position: vec3f,
+    v: vec3f,
+}
+        `
+
         const templateCode = (code) => { return  commonWgsl + code; }
         const createMod = (code) => device.createShaderModule({ code: templateCode(code) });
 
-        const clearGridModule = createMod(clearGrid);
-        const p2g1Module = createMod(p2g_1);
-        const p2g2Module = createMod(p2g_2);
-        const updateGridModule = createMod(updateGrid);
-        const g2pModule = createMod(g2p);
-        const copyPositionModule = createMod(copyPosition);
-        const resetParticlesModule = createMod(resetParticlesWgsl);
+        const clearGridModule = createMod(/*wgsl*/`
+@group(0) @binding(0) var<storage, read_write> cells: array<Cell>;
+
+@compute @workgroup_size(64)
+fn clearGrid(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (id.x < arrayLength(&cells)) {
+        cells[id.x].mass = 0;
+        cells[id.x].vx = 0;
+        cells[id.x].vy = 0;
+        cells[id.x].vz = 0;
+    }
+}
+        `);
+        const p2g1Module = createMod(/*wgsl*/`
+@group(0) @binding(0) var<storage, read> particles: array<Particle>;
+@group(0) @binding(1) var<storage, read_write> cells: array<AtomicCell>;
+@group(0) @binding(2) var<uniform> initBoxSize: vec3f;
+@group(0) @binding(3) var<uniform> numParticles: u32;
+
+@compute @workgroup_size(64)
+fn p2g_1(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (id.x < numParticles) {
+        var weights: array<vec3f, 3>;
+
+        let particle = particles[id.x];
+        let cellIndex: vec3f = floor(particle.position);
+        let cellDiff: vec3f = particle.position - (cellIndex + 0.5f);
+        weights[0] = 0.5f * (0.5f - cellDiff) * (0.5f - cellDiff);
+        weights[1] = 0.75f - cellDiff * cellDiff;
+        weights[2] = 0.5f * (0.5f + cellDiff) * (0.5f + cellDiff);
+
+        let C: mat3x3f = particle.C;
+
+        for (var gx = 0; gx < 3; gx++) {
+            for (var gy = 0; gy < 3; gy++) {
+                for (var gz = 0; gz < 3; gz++) {
+                    let weight: f32 = weights[gx].x * weights[gy].y * weights[gz].z;
+                    let cellX: vec3f = vec3f(
+                            cellIndex.x + f32(gx) - 1.,
+                            cellIndex.y + f32(gy) - 1.,
+                            cellIndex.z + f32(gz) - 1.
+                        );
+                    let cellDist = (cellX + 0.5f) - particle.position;
+
+                    let Q: vec3f = C * cellDist;
+
+                    let massContrib: f32 = weight * 1.0; // assuming particle.mass = 1.0
+                    let velContrib: vec3f = massContrib * (particle.v + Q);
+                    let cellIndex1D: i32 =
+                        i32(cellX.x) * i32(initBoxSize.y) * i32(initBoxSize.z) +
+                        i32(cellX.y) * i32(initBoxSize.z) +
+                        i32(cellX.z);
+                    atomicAdd(&cells[cellIndex1D].mass, encodeFixedPoint(massContrib));
+                    atomicAdd(&cells[cellIndex1D].vx, encodeFixedPoint(velContrib.x));
+                    atomicAdd(&cells[cellIndex1D].vy, encodeFixedPoint(velContrib.y));
+                    atomicAdd(&cells[cellIndex1D].vz, encodeFixedPoint(velContrib.z));
+                }
+            }
+        }
+    }
+}
+        `);
+        const p2g2Module = createMod(/*wgsl*/`
+@group(0) @binding(0) var<storage, read> particles: array<Particle>;
+@group(0) @binding(1) var<storage, read_write> cells: array<AtomicCellWithoutMass>;
+@group(0) @binding(2) var<uniform> initBoxSize: vec3f;
+@group(0) @binding(3) var<uniform> numParticles: u32;
+@group(0) @binding(4) var<uniform> dt: f32;
+
+@compute @workgroup_size(64)
+fn p2g_2(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (id.x < numParticles) {
+        var weights: array<vec3f, 3>;
+
+        let particle = particles[id.x];
+        let cellIndex: vec3f = floor(particle.position);
+        let cellDiff: vec3f = particle.position - (cellIndex + 0.5f);
+        weights[0] = 0.5f * (0.5f - cellDiff) * (0.5f - cellDiff);
+        weights[1] = 0.75f - cellDiff * cellDiff;
+        weights[2] = 0.5f * (0.5f + cellDiff) * (0.5f + cellDiff);
+
+        var density: f32 = 0.;
+        for (var gx = 0; gx < 3; gx++) {
+            for (var gy = 0; gy < 3; gy++) {
+                for (var gz = 0; gz < 3; gz++) {
+                    let weight: f32 = weights[gx].x * weights[gy].y * weights[gz].z;
+                    let cellX: vec3f = vec3f(
+                            cellIndex.x + f32(gx) - 1.,
+                            cellIndex.y + f32(gy) - 1.,
+                            cellIndex.z + f32(gz) - 1.
+                        );
+                    let cellIndex1D: i32 =
+                        i32(cellX.x) * i32(initBoxSize.y) * i32(initBoxSize.z) +
+                        i32(cellX.y) * i32(initBoxSize.z) +
+                        i32(cellX.z);
+                    density += decodeFixedPoint(cells[cellIndex1D].mass) * weight;
+                }
+            }
+        }
+
+        let volume: f32 = 1.0 / density; // particle.mass = 1.0;
+        // densities[id.x] = density;
+
+        let pressure: f32 = max(-0.0, stiffness * (pow(density / restDensity, 1.) - 1));
+
+        var stress: mat3x3f = mat3x3f(-pressure, 0, 0, 0, -pressure, 0, 0, 0, -pressure);
+        let dudv: mat3x3f = particle.C;
+        let strain: mat3x3f = dudv + transpose(dudv);
+        stress += dynamicViscosity * strain;
+
+        let eq_16_term0 = -volume * 4 * stress * dt;
+
+        for (var gx = 0; gx < 3; gx++) {
+            for (var gy = 0; gy < 3; gy++) {
+                for (var gz = 0; gz < 3; gz++) {
+                    let weight: f32 = weights[gx].x * weights[gy].y * weights[gz].z;
+                    let cellX: vec3f = vec3f(
+                            cellIndex.x + f32(gx) - 1.,
+                            cellIndex.y + f32(gy) - 1.,
+                            cellIndex.z + f32(gz) - 1.
+                        );
+                    let cellDist = (cellX + 0.5f) - particle.position;
+                    let cellIndex1D: i32 =
+                        i32(cellX.x) * i32(initBoxSize.y) * i32(initBoxSize.z) +
+                        i32(cellX.y) * i32(initBoxSize.z) +
+                        i32(cellX.z);
+                    let momentum: vec3f = eq_16_term0 * weight * cellDist;
+                    atomicAdd(&cells[cellIndex1D].vx, encodeFixedPoint(momentum.x));
+                    atomicAdd(&cells[cellIndex1D].vy, encodeFixedPoint(momentum.y));
+                    atomicAdd(&cells[cellIndex1D].vz, encodeFixedPoint(momentum.z));
+                }
+            }
+        }
+    }
+}
+`);
+        const updateGridModule = createMod(/*wgsl*/`
+@group(0) @binding(0) var<storage, read_write> cells: array<Cell>;
+@group(0) @binding(1) var<uniform> realBoxSize: vec3f;
+@group(0) @binding(2) var<uniform> initBoxSize: vec3f;
+@group(0) @binding(3) var<uniform> dt: f32;
+
+@compute @workgroup_size(64)
+fn updateGrid(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (id.x < arrayLength(&cells)) {
+        var forceDir = vec3f(0.);
+        let dt = dt;
+        if (cells[id.x].mass > 0) {
+            var floatV: vec3f = vec3f(
+                decodeFixedPoint(cells[id.x].vx),
+                decodeFixedPoint(cells[id.x].vy),
+                decodeFixedPoint(cells[id.x].vz)
+            );
+            floatV /= decodeFixedPoint(cells[id.x].mass);
+            let strength = 0.0;
+            cells[id.x].vx = encodeFixedPoint(floatV.x + strength * forceDir.x);
+            cells[id.x].vy = encodeFixedPoint(floatV.y + strength * forceDir.y - 0.40 * dt);
+            cells[id.x].vz = encodeFixedPoint(floatV.z + strength * forceDir.z);
+            var x: i32 = i32(id.x) / i32(initBoxSize.z) / i32(initBoxSize.y);
+            var y: i32 = (i32(id.x) / i32(initBoxSize.z)) % i32(initBoxSize.y);
+            var z: i32 = i32(id.x) % i32(initBoxSize.z);
+            if (x < 2 || x > i32(ceil(realBoxSize.x) - 3)) { cells[id.x].vx = 0; }
+            if (y < 2 || y > i32(ceil(realBoxSize.y) - 3)) { cells[id.x].vy = 0; }
+            if (z < 2 || z > i32(ceil(realBoxSize.z) - 3)) { cells[id.x].vz = 0; }
+        }
+    }
+}
+        `);
+        const g2pModule = createMod(/*wgsl*/`
+@group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
+@group(0) @binding(1) var<storage, read> cells: array<Cell>;
+@group(0) @binding(2) var<uniform> realBoxSize: vec3f;
+@group(0) @binding(3) var<uniform> initBoxSize: vec3f;
+@group(0) @binding(4) var<uniform> numParticles: u32;
+@group(0) @binding(5) var<uniform> dt: f32;
+
+@compute @workgroup_size(64)
+fn g2p(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (id.x < numParticles) {
+        particles[id.x].v = vec3f(0.);
+        var weights: array<vec3f, 3>;
+
+        let particle = particles[id.x];
+        let cellIndex: vec3f = floor(particle.position);
+        let cellDiff: vec3f = particle.position - (cellIndex + 0.5f);
+        weights[0] = 0.5f * (0.5f - cellDiff) * (0.5f - cellDiff);
+        weights[1] = 0.75f - cellDiff * cellDiff;
+        weights[2] = 0.5f * (0.5f + cellDiff) * (0.5f + cellDiff);
+
+        var B: mat3x3f = mat3x3f(vec3f(0.), vec3f(0.), vec3f(0.));
+        for (var gx = 0; gx < 3; gx++) {
+            for (var gy = 0; gy < 3; gy++) {
+                for (var gz = 0; gz < 3; gz++) {
+                    let weight: f32 = weights[gx].x * weights[gy].y * weights[gz].z;
+                    let cellX: vec3f = vec3f(
+                        cellIndex.x + f32(gx) - 1.,
+                        cellIndex.y + f32(gy) - 1.,
+                        cellIndex.z + f32(gz) - 1.
+                    );
+                    let cellDist: vec3f = (cellX + 0.5f) - particle.position;
+                    let cellIndex1D: i32 =
+                        i32(cellX.x) * i32(initBoxSize.y) * i32(initBoxSize.z) +
+                        i32(cellX.y) * i32(initBoxSize.z) +
+                        i32(cellX.z);
+                    let weighted_velocity: vec3f = vec3f(
+                        decodeFixedPoint(cells[cellIndex1D].vx),
+                        decodeFixedPoint(cells[cellIndex1D].vy),
+                        decodeFixedPoint(cells[cellIndex1D].vz)
+                    ) * weight;
+                    let term: mat3x3f = mat3x3f(
+                        weighted_velocity * cellDist.x,
+                        weighted_velocity * cellDist.y,
+                        weighted_velocity * cellDist.z
+                    );
+
+                    B += term;
+
+                    particles[id.x].v += weighted_velocity;
+                }
+            }
+        }
+
+        particles[id.x].C = B * 4.0f;
+        particles[id.x].position += particles[id.x].v * dt;
+        particles[id.x].position = vec3f(
+            clamp(particles[id.x].position.x, 1., realBoxSize.x - 2.),
+            clamp(particles[id.x].position.y, 1., realBoxSize.y - 2.),
+            clamp(particles[id.x].position.z, 1., realBoxSize.z - 2.)
+        );
+
+        let center = vec3f(realBoxSize.x / 2, realBoxSize.y / 2, realBoxSize.z / 2);
+        let dist = center - particles[id.x].position;
+        let dirToOrigin = normalize(dist);
+        var rForce = vec3f(0);
+
+
+        let k = 2.0;
+        let wallStiffness = 1.0;
+        let x_n: vec3f = particles[id.x].position + particles[id.x].v * dt * k;
+        let wallMin: vec3f = vec3f(3.);
+        let wallMax: vec3f = realBoxSize - 4.;
+        if (x_n.x < wallMin.x) { particles[id.x].v.x += wallStiffness * (wallMin.x - x_n.x); }
+        if (x_n.x > wallMax.x) { particles[id.x].v.x += wallStiffness * (wallMax.x - x_n.x); }
+        if (x_n.y < wallMin.y) { particles[id.x].v.y += wallStiffness * (wallMin.y - x_n.y); }
+        if (x_n.y > wallMax.y) { particles[id.x].v.y += wallStiffness * (wallMax.y - x_n.y); }
+        if (x_n.z < wallMin.z) { particles[id.x].v.z += wallStiffness * (wallMin.z - x_n.z); }
+        if (x_n.z > wallMax.z) { particles[id.x].v.z += wallStiffness * (wallMax.z - x_n.z); }
+    }
+}
+        `);
+        const copyPositionModule = createMod(/*wgsl*/`
+@group(0) @binding(0) var<storage, read> particles: array<Particle>;
+@group(0) @binding(1) var<storage, read_write> posvel: array<PosVel>;
+@group(0) @binding(2) var<uniform> numParticles: u32;
+
+@compute @workgroup_size(64)
+fn copyPosition(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (id.x < numParticles) {
+        posvel[id.x].position = particles[id.x].position;
+        posvel[id.x].v = particles[id.x].v;
+    }
+}
+
+        `);
+        const resetParticlesModule = createMod(/*wgsl*/`
+@group(0) @binding(0) var<storage, read_write> particles: array<Particle>;
+@group(0) @binding(1) var<uniform> realBoxSize: vec3f;
+@group(0) @binding(2) var<uniform> numParticles: u32;
+
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+    if (id.x < numParticles) {
+        var side = u32(pow(f32(numParticles), 1.0/3.0));
+        let x = id.x % side;
+        let y = id.x / side % side;
+        let z = id.x / (side * side);
+        var unitCube = vec3f(f32(x), f32(y), f32(z)) / f32(side);
+        let pos = realBoxSize * .25 + unitCube * realBoxSize * .5;
+        particles[id.x].position = pos;
+    }
+}
+        `);
 
         this.clearGridPipeline = device.createComputePipeline({
             label: "clear grid pipeline",
