@@ -1,5 +1,5 @@
 import { Camera } from './camera'
-import { mlsmpmParticleStructSize, MLSMPMSimulator } from './mls-mpm/mls-mpm'
+import { mlsmpmParticleStructSize, MLSMPMSimulator } from './mls-mpm/mls-mpm.js'
 import { renderUniformsViews, renderUniformsValues } from './camera'
 import { FluidRenderer } from './render/fluidRender'
 import GUI from 'lil-gui';
