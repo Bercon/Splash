@@ -242,10 +242,9 @@ async function main() {
 	const mlsmpmZoomRate = 0.7
 	const fixedPointMultiplier = 1e7
 	const mlsmpmSimulator = new MLSMPMSimulator(
-		particleBuffer, posvelBuffer, renderUniformBuffer, densityGridBuffer, castedDensityGridBuffer,
-		initBoxSizeBuffer, densityGridSizeBuffer,
-		device, depthMapTextureView, canvas,
-		maxGridCount, maxParticleCount, fixedPointMultiplier, mlsmpmDiameter
+		particleBuffer, posvelBuffer, 		initBoxSizeBuffer,
+		device,
+		maxGridCount, maxParticleCount, mlsmpmDiameter
 	)
 	const mlsmpmRenderer = new FluidRenderer(
 		renderUniformBuffer, posvelBuffer, densityGridSizeBuffer, initBoxSizeBuffer,
@@ -324,11 +323,7 @@ async function main() {
 		const commandEncoder = device.createCommandEncoder()
 
 		let maxDt = 0.4;
-		mlsmpmSimulator.execute(commandEncoder,
-			[camera.currentHoverX / canvas.clientWidth, camera.currentHoverY / canvas.clientHeight],
-			camera.calcMouseVelocity(), simulationParam.mouseRadius, sphereRenderFl, maxDt * guiParams.speed, guiParams.running,
-			densityGridSize
-		)
+		mlsmpmSimulator.execute(commandEncoder, maxDt * guiParams.speed, guiParams.running)
 		let normalizedDiffuseColor = [guiParams.r / 255, guiParams.g / 255, guiParams.b / 255];
 		mlsmpmRenderer.execute(context, commandEncoder, mlsmpmSimulator.numParticles, sphereRenderFl, normalizedDiffuseColor,
 			guiParams.colorDensity)

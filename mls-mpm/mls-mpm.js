@@ -2,22 +2,14 @@ export const mlsmpmParticleStructSize = 80
 
 export class MLSMPMSimulator {
     constructor (
-                particleBuffer,
-                posvelBuffer,
-                renderUniformBuffer,
-                densityGridBuffer,
-                castedDensityGridBuffer,
-                initBoxSizeBuffer,
-                densityGridSizeBuffer,
-                device,
-                depthMapTextureView,
-                canvas,
-                maxGridCount,
-                maxParticleCount,
-                fixedPointMultiplier,
-                renderDiameter,
-        )
-    {
+        particleBuffer,
+        posvelBuffer,
+        initBoxSizeBuffer,
+        device,
+        maxGridCount,
+        maxParticleCount,
+        renderDiameter,
+    ) {
         this.cellStructSize = 16;
         this.numParticles = 0
         this.gridCount = 0
@@ -441,11 +433,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             size: 4, // 1 x f32
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
-        // this.mouseInfoUniformBuffer = device.createBuffer({
-        //     label: 'mouse info buffer',
-        //     size: this.mouseInfoValues.byteLength,
-        //     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        // })
         this.sphereRadiusBuffer = device.createBuffer({
             label: 'sphere radius buffer',
             size: 4, // 1 x f32
@@ -456,10 +443,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             size: 4, // 1 x f32
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         })
-
-        // this.mouseInfoViews.screenSize.set([canvas.width, canvas.height]);
-        // this.device.queue.writeBuffer(this.mouseInfoUniformBuffer, 0, this.mouseInfoValues);
-
         // BindGroup
         this.clearGridBindGroup = device.createBindGroup({
             layout: this.clearGridPipeline.getBindGroupLayout(0),
@@ -526,10 +509,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
 
         this.particleBuffer = particleBuffer
-        this.densityGridBuffer = densityGridBuffer
     }
 
-    initDambreak(initBoxSize, numParticles) {
+    initDambreak(numParticles) {
         let particlesBuf = new ArrayBuffer(mlsmpmParticleStructSize * this.maxParticleCount);
         this.numParticles = numParticles;
         let particles = new ArrayBuffer(mlsmpmParticleStructSize * this.numParticles);
@@ -548,16 +530,14 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         const initBoxSizeArray = new Float32Array(initBoxSize)
         this.device.queue.writeBuffer(this.initBoxSizeBuffer, 0, initBoxSizeArray)
         this.frameCount = 0;
-        let particles = this.initDambreak(initBoxSize, numParticles)
+        let particles = this.initDambreak(numParticles)
         this.device.queue.writeBuffer(this.particleBuffer, 0, particles)
         this.changeBoxSize(initBoxSize)
         this.changeNumParticles(this.numParticles)
         this.initParticles = true;
     }
 
-    execute(commandEncoder, mouseCoord, mouseVel, mouseRadius,
-        densityGridFlag, dt, running, densityGridSize
-    ) {
+    execute(commandEncoder,dt, running) {
         const computePass = commandEncoder.beginComputePass();
         // console.log(dt);
         const dtArray = new Float32Array([dt])
